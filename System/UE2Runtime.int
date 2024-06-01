@@ -1,0 +1,5 @@
+[General]
+Start=UnrealEngine2 Runtime (Starting)
+Exit=UnrealEngine2 Runtime (Exiting)
+Run=UnrealEngine2 Runtime (Running)
+Product=UnrealEngine2 Runtime
