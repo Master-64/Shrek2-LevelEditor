@@ -3621,6 +3621,11 @@ event Tick(float DeltaTime)
 	if(bIsSliding)
 	{
 		TickSliding(DeltaTime);
+		
+		if(Base != none)
+		{
+			FallOrginLocation = Location;
+		}
 	}
 	
 	if(bCanBlink)
