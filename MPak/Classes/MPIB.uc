@@ -697,6 +697,7 @@ state LadderClimbFinish
 defaultproperties
 {
 	fFatalFallDamageMultiplier=0.1
+	DeathIfFallDistance=1000.0
 	fDamageMultiplier=2.0
 	AirControl=0.5
 	fJumpDist=384.0
