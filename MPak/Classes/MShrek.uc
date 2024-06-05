@@ -451,7 +451,7 @@ defaultproperties
 	iThirdAttackSplashDamage=7
 	iRunAttackDamage=3
 	iSpecialAttackDamage=14
-	fThrowVelocity=600.0
+	fThrowVelocity=1200.0
 	fDamageMultiplier=0.8
 	BottleAttachOffset=(X=-9,Y=5,Z=-6)
 	BottleAttachRotation=(Roll=14999)
