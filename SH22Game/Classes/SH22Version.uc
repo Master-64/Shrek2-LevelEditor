@@ -14,6 +14,6 @@ var() string Version, ModName;
 
 defaultproperties
 {
-	Version="Build 146"
+	Version="Build 168"
 	ModName="SH2.2"
 }

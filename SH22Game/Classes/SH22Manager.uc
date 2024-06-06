@@ -35,6 +35,7 @@ event PostLoadGame(bool bLoadFromSaveGame)
 	PC.FOV(C.GetFOV());
 	
 	U.CC("Set MHeroPawn bModifiedBumplines True");
+	U.CC("Set DefaultPhysicsVolume TerminalVelocity 10000.0");
 	U.CC("Set SHHeroPawn SaveCameraNoSnapRotation" @ string(!C.bAutoLevelCamera));
 	U.CC("Set SHHeroPawn CameraNoSnapRotation" @ string(!C.bAutoLevelCamera));
 	
