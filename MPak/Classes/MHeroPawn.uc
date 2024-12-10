@@ -18,7 +18,8 @@ var int iDoubleJumpCounter, iAirJumpCounter;
 var(Animation) name _MovementAnims[4];
 var(AnimTweaks) float _BaseMovementRate;
 var name nOldState;
-var float MJumpZ, fTimeSinceLastTiredDialog, _AccelRate;
+var float _JumpZ, fTimeSinceLastTiredDialog, _AccelRate;
+// Note to self: come back to this code and improve the _ variable implementations :)
 var class<AIController> AIC;
 var KWHeroController PC;
 var Pawn HP, ICP;
@@ -1736,9 +1737,9 @@ function SetJumpVars()
 	local float Time, Distance;
 	
 	SetPropertyText("JumpZ", string(Sqrt((-2.0 * default.fJumpHeight) * PhysicsVolume.default.Gravity.Z)));
-	MJumpZ = float(GetPropertyText("JumpZ"));
+	_JumpZ = float(GetPropertyText("JumpZ"));
 	DoubleJumpZ = Sqrt((-2.0 * fDoubleJumpHeight) * PhysicsVolume.Gravity.Z);
-	Time = -MJumpZ / PhysicsVolume.Gravity.Z;
+	Time = -_JumpZ / PhysicsVolume.Gravity.Z;
 	Distance = (GroundSpeed * Time) * 2.0;
 	fJumpDistScalar = fJumpDist / Distance;
 }
@@ -1830,7 +1831,7 @@ protected function bool Pawn_DoJump(bool bUpdating)
 		
 		if(Physics == PHYS_Spider)
 		{
-			Velocity = MJumpZ * Floor;
+			Velocity = _JumpZ * Floor;
 		}
 		else if(Physics == PHYS_Ladder)
 		{
@@ -1838,11 +1839,11 @@ protected function bool Pawn_DoJump(bool bUpdating)
 		}
 		else if(bIsWalking)
 		{
-			Velocity.Z = default.MJumpZ;
+			Velocity.Z = default._JumpZ;
 		}
 		else
 		{
-			Velocity.Z = MJumpZ;
+			Velocity.Z = _JumpZ;
 		}
 		
 		if(Base != none && !Base.bWorldGeometry)
@@ -4091,7 +4092,7 @@ protected function Pawn_TakeFallingDamage()
 	}
 	else
 	{
-		if(Velocity.Z < (-1.4 * MJumpZ))
+		if(Velocity.Z < (-1.4 * _JumpZ))
 		{
 			MakeNoise(0.5);
 		}
@@ -4617,6 +4618,8 @@ function KillAllEnemiesAround(float killradius)
 
 function UpdateShrekHealth();
 
+// End of SHHeroPawn function overrides, all parent functions are NOT overridden in this class, so you will need to do it manually
+
 // Miscellaneous function overrides start here until states
 
 function float DeliverLocalizedDialog(string DlgID, bool bPlaySound, optional float fDisplayDuration, optional string IntFileName, optional string ExplicitString, optional bool No3D, optional float fVolume, optional bool bNoSubtitle, optional bool bUseSlotIn, optional Actor.ESoundSlot SlotIn)
@@ -4632,6 +4635,7 @@ function float DeliverLocalizedDialog(string DlgID, bool bPlaySound, optional fl
 	
 	return fReturn;
 }
+
 
 auto state StateIdle
 {

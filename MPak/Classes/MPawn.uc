@@ -4,6 +4,46 @@
 // *   May be modified but not without proper credit!  *
 // *	 https://master-64.itch.io/shrek-2-pc-mpak	   *
 // *****************************************************
+// 
+// All variables here must be modified with SetPropertyText() and GetPropertyText()
+// var(Movement) bool bCanJump;
+// var(Movement) bool bCanWalk;
+// var(Movement) bool bCanSwim;
+// var(Movement) bool bCanFly;
+// var(Movement) bool bCanClimbLadders;
+// var(Movement) bool bCanStrafe;
+// var(Movement) bool bCanDoubleJump;
+// var(Movement) bool bAvoidLedges;
+// var(Movement) bool bStopAtLedges;
+// var() bool bCanBeBaseForPawns;
+// var(Movement) float WaterSpeed;
+// var(Movement) float AirSpeed;
+// var(Movement) float LadderSpeed;
+// var(Movement) float AccelRate;
+// var(Movement) float JumpZ;
+// var(Health) travel float Health;
+// var(AI) class<AIController> ControllerClass;
+// var(AnimTweaks) float BaseMovementRate;
+// var(Animation) name MovementAnims[4];
+// var(PlayerControl) bool bIsMainPlayer;
+// var bool bUseAccelRateForWalkingBrake;
+// var float fMinFloorZ;
+// var(Skeletal) name MouthBone;
+// var const Pawn nextPawn;
+// var const Pawn nextSpecialPawn;
+// var bool bSpecialPawn;
+// var(AI) bool bUseRealTimePathCheck;
+// var bool bLumosOn;
+// var bool bLumosOff;
+// var float fLumosRadius;
+// var(Movement) float StepHeight;
+// var(Movement) float StepWidth;
+// var float MaxMountHeight;
+// var bool bUseStaticMeshSizeForMount;
+// var(Movement) float GroundFrictionOverride;
+// var(Movement) bool bOverrideGroundFriction;
+// var(Movement) float FlyFrictionOverride;
+// var(Movement) bool bOverrideFlyFriction;
 
 
 class MPawn extends SHPawn
@@ -11,6 +51,14 @@ class MPawn extends SHPawn
 	Config(MPak);
 
 
+var() bool bModifiedBumplines;
+// var() bool bCanMount, bCannotJump, bDisableLandBobbing, bDisableFallDamage, bModifiedBumplines;
+var() float fBlinkChance;
+// var() float fLandingBobMultiplier;
+var(Animation) name _MovementAnims[4];
+var(AnimTweaks) float _BaseMovementRate;
+var(Routing) array<string> Routes;
+var name nPreCutPossessState[2];
 var class<AIController> AIC;
 var KWHeroController PC;
 var Pawn HP, ICP;
@@ -147,6 +195,179 @@ event PostBeginPlay()
 	AnimBlendParams(ARMCHANNEL_LEFT, 0.0, 0.0, 0.0, LEFT_ARM_BONE);
 }
 
+event Tick(float DeltaTime)
+{
+	PC = U.GetPC();
+	HP = U.GetHP();
+	
+	if(bIsSliding)
+	{
+		TickSliding(DeltaTime);
+	}
+	
+	if(bCanBlink)
+	{
+		fBlinkingTime -= DeltaTime;
+		
+		if(U.PercentChance(fBlinkChance) && fBlinkingTime <= 0.0)
+		{
+			StartBlinkAnimation();
+		}
+		
+		if(fBlinkingTime < 0.0)
+		{
+			StopBlinkAnimation();
+		}
+	}
+	
+	fDespawnTime += DeltaTime;
+	
+	if(fDespawnTime >= 1.0)
+	{
+		fDespawnTime = 0.0;
+		
+		if(bDespawnable && bDespawned)
+		{
+			if(!U.GetCam().CameraCanSeeYou(Location))
+			{
+				Destroy();
+			}
+		}
+	}
+	
+	if(IsLeadChar())
+	{
+		if(VSize2d(Acceleration) > 5.0 || vOldLocation != Location)
+		{
+			SetTargetLocations();
+		}
+		
+		bUseLastLocationArray = true;
+	}
+	
+	if(bUseLastLocationArray)
+	{
+		TickLastLocationArray(DeltaTime);
+	}
+	
+	if(Acceleration.X != 0.0 || Acceleration.Y != 0.0)
+	{
+		if(PawnAccelerationTimer == 0.0)
+		{
+			OnStartedAccelerating();
+		}
+		
+		PawnMotionlessTimer = 0.0;
+		PawnAccelerationTimer += DeltaTime;
+	}
+	else
+	{
+		if(PawnMotionlessTimer == 0.0)
+		{
+			OnStoppedAccelerating();
+		}
+		
+		PawnAccelerationTimer = 0.0;
+		PawnMotionlessTimer += DeltaTime;
+	}
+	
+	if(Physics == PHYS_Walking)
+	{
+		vLastGroundPosition = Location;
+		vYawAtLastGroundPosition = Rotation.Yaw;
+		
+		if(WaterRipples != none)
+		{
+			PlayWaterRipples(DeltaTime);
+		}
+	}
+	
+	if(ExtraAccelTimer > 0.0)
+	{
+		ExtraAccelTimer -= DeltaTime;
+		
+		if(ExtraAccelTimer <= 0.0)
+		{
+			ExtraAccelTimer = 0.0;
+			ConstantAcceleration = U.Vec(0.0, 0.0, 0.0);
+		}
+	}
+	
+	if(AdditionalPrePivotDest != AdditionalPrePivot)
+	{
+		TickPrePivotTweening(DeltaTime);
+	}
+	
+	if(!bUnableToBounce && BouncePadHit != none && U.GetHealth(self) > 0.0)
+	{
+		DoJump(true);
+		BouncePadHit.OnBounce(self);
+		OnBounceExtra(BouncePadHit.bCanMoveWhileJumping);
+		BouncePadHit = none;
+	}
+	
+	if(bTweenGroundSpeed)
+	{
+		TickGroundSpeedTweening(DeltaTime);
+	}
+	
+	if(Physics == PHYS_Falling && bFallingAutoDecel2d && Acceleration == U.Vec(0.0, 0.0, 0.0) && VSize2d(Velocity) > 10.0)
+	{
+		Velocity -= (normal2d(Velocity) * 400.0 * DeltaTime);
+	}
+	
+	if(bControlsCameraRot && PC.bUseBaseCam)
+	{
+		U.GetCam().ApplyInput(DeltaTime);
+	}
+	
+	vOldLocation = Location;
+	
+	ProcessMovementAnims();
+}
+
+function ProcessMovementAnims()
+{
+	local byte bDirection;
+	
+	bDirection = GetRunningDirection();
+	
+	if(bDirection > -1)
+	{
+		LoopAnim(_MovementAnims[bDirection], 1.0, 0.2, 0);
+	}
+	else
+	{
+		PlayIdle();
+	}
+}
+
+function byte GetRunningDirection()
+{
+	PC = U.GetPC();
+	
+	if(PC.aBaseY > 0.0)
+	{
+		return 0; // Forward
+	}
+	else if(PC.aBaseY < 0.0)
+	{
+		return 1; // Backward
+	}
+	else if(PC.aStrafe < 0.0)
+	{
+		return 2; // Left
+	}
+	else if(PC.aStrafe > 0.0)
+	{
+		return 3; // Right
+	}
+	else
+	{
+		return -1; // Not moving
+	}
+}
+
 function MUtils GetUtils()
 {
 	local MUtils Ut;
@@ -267,6 +488,20 @@ event PostLoadGame(bool bLoadFromSaveGame)
 		bInitializeAnimation = false;
 		PlayWaiting();
 	}
+}
+
+function float DeliverLocalizedDialog(string DlgID, bool bPlaySound, optional float fDisplayDuration, optional string IntFileName, optional string ExplicitString, optional bool No3D, optional float fVolume, optional bool bNoSubtitle, optional bool bUseSlotIn, optional Actor.ESoundSlot SlotIn)
+{
+	local float fReturn;
+	
+	fReturn = super.DeliverLocalizedDialog(DlgID, bPlaySound, fDisplayDuration, IntFileName, ExplicitString, No3D, fVolume, bNoSubtitle, bUseSlotIn, SlotIn);
+	
+	if(bModifiedBumplines)
+	{
+		U.LipSyncDialog(self, Sound(DynamicLoadObject("AllDialog." $ DlgID, class'Sound')), Localize("all", DlgID, "HPdialog"));
+	}
+	
+	return fReturn;
 }
 
 
@@ -404,10 +639,10 @@ defaultproperties
 	ShimmySpeed=70.0
 	RunningGameSlot=9998
 	ControllerClass=none
-	MovementAnims(0)=run
-	MovementAnims(1)=Run_Back
-	MovementAnims(2)=Run_Left
-	MovementAnims(3)=Run_Right
+	_MovementAnims(0)=run
+	_MovementAnims(1)=Run_Back
+	_MovementAnims(2)=Run_Left
+	_MovementAnims(3)=Run_Right
 	TurnLeftAnim=StandTurnLeft135
 	TurnRightAnim=StandTurnRight135
 	Physics=PHYS_Walking

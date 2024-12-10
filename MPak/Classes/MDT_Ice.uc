@@ -6,15 +6,11 @@
 // *****************************************************
 
 
-class MVersion extends MInfo
+class MDT_Ice extends DamageType
 	Config(MPak);
-
-
-var() string Version, ModName;
 
 
 defaultproperties
 {
-	Version="Build 44"
-	ModName="MPak"
+	DeathString="%o was frozen to death from %k."
 }

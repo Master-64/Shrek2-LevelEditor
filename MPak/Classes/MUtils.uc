@@ -71,6 +71,24 @@ enum EFont
 	F_TinyArielFont
 };
 
+struct MinMaxStruct
+{
+	var() int Min, Max;
+	var int Count;
+};
+
+struct MinMaxFStruct
+{
+	var() float Min, Max;
+	var float Count;
+};
+
+struct MinMaxSStruct
+{
+	var() string Min, Max;
+	var string Count;
+};
+
 const MaxFloat = 340282346638528860000000000000000000000.0f;
 const sLoremIpsum = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.";
 
@@ -93,14 +111,6 @@ event PreBeginPlay()
 	super.PreBeginPlay();
 	
 	IM = Spawn(class'MInputManager');
-}
-
-event PostBeginPlay()
-{
-	super.PostBeginPlay();
-	
-	// LevelInfo.InventoryCarrierPawn is only updated once and should never be adjusted from that point
-	CoreGetICP();
 }
 
 event Tick(float DeltaTime)
@@ -128,6 +138,9 @@ event PostLoadGame(bool bLoadFromSaveGame)
 	{
 		GetPC();
 	}
+	
+	// LevelInfo.InventoryCarrierPawn is only updated once and should never be adjusted from that point
+	CoreGetICP();
 	
 	bLevelLoaded = true;
 	
@@ -3093,6 +3106,7 @@ function ChangeLevel(string sLevelName, optional bool bKeepInventory)
 		GetPC();
 	}
 	
+	// Make sure no GUIs get stuck on top of the screen
 	PC.ClientCloseMenu(true);
 	
 	Level.Game.ProcessServerTravel(sLevelName, bKeepInventory);
@@ -3371,16 +3385,9 @@ function bool IsShrek22()
 	return Level.Game.IsA('SH22Game');
 }
 
-static function bool IsActorBehindActor(Actor A1, Actor A2, optional float fAttackAngle)
+static function bool IsRotBehindRot(rotator R1, rotator R2, optional float fAttackAngle)
 {
-	local vector dir1, dir2;
-	local rotator rot1, rot2;
 	local float cosYaw, cosAngle;
-	
-	if(A1 == none || A2 == none)
-	{
-		return false;
-	}
 	
 	if(fAttackAngle <= 0.0)
 	{
@@ -3388,15 +3395,16 @@ static function bool IsActorBehindActor(Actor A1, Actor A2, optional float fAtta
 		fAttackAngle = class'SHEnemy'.default.AttackAngle;
 	}
 	
-	rot1 = A1.Rotation;
-	rot2 = A2.Rotation;
-	dir1 = vector(rot1);
-	dir2 = vector(rot2);
-	cosYaw = dir1 Dot dir2;
+	cosYaw = vector(R1) Dot vector(R2);
 	cosYaw *= -1.0;
 	cosAngle = Cos((fAttackAngle * PI) / 180.0);
 	
 	return cosYaw < cosAngle;
+}
+
+static function bool IsActorBehindActor(Actor A1, Actor A2, optional float fAttackAngle)
+{
+	return static.IsRotBehindRot(A1.Rotation, A2.Rotation, fAttackAngle);
 }
 
 static function float Fact(int iValue)
@@ -3474,6 +3482,34 @@ function Mutator GetMutator(class<Mutator> MutatorClass)
 		{
 			return M;
 		}
+	}
+}
+
+function vector RandVector(float fRadius)
+{
+	local vector V;
+	
+	V.X = RandRangeFloat(-fRadius, fRadius);
+	V.Y = RandRangeFloat(-fRadius, fRadius);
+	V.Z = RandRangeFloat(-fRadius, fRadius);
+	
+	return V;
+}
+
+function SetConsoleKey(byte bKeyName)
+{
+	U.CC("Set ini:Engine.Engine.Console ConsoleKey" @ string(bKeyName));
+}
+
+static function bool Contains(string sKey, string sValue, optional bool bCaseSensitive)
+{
+	if(!bCaseSensitive)
+	{
+		return InStr(Caps(sKey), Caps(sValue)) > -1;
+	}
+	else
+	{
+		return InStr(sKey, sValue) > -1;
 	}
 }
 
