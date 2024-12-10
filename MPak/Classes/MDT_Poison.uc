@@ -6,15 +6,11 @@
 // *****************************************************
 
 
-class MVersion extends MInfo
+class MDT_Poison extends DamageType
 	Config(MPak);
-
-
-var() string Version, ModName;
 
 
 defaultproperties
 {
-	Version="Build 44"
-	ModName="MPak"
+	DeathString="%o was poisoned to death from %k."
 }

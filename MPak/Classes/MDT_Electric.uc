@@ -6,15 +6,11 @@
 // *****************************************************
 
 
-class MVersion extends MInfo
+class MDT_Electric extends DamageType
 	Config(MPak);
-
-
-var() string Version, ModName;
 
 
 defaultproperties
 {
-	Version="Build 44"
-	ModName="MPak"
+	DeathString="%o was electrocuted to death from %k."
 }
