@@ -35,7 +35,6 @@ event PostLoadGame(bool bLoadFromSaveGame)
 	PC.FOV(C.GetFOV());
 	
 	U.CC("Set MHeroPawn bModifiedBumplines True");
-	U.CC("Set DefaultPhysicsVolume TerminalVelocity 10000.0");
 	U.CC("Set SHHeroPawn SaveCameraNoSnapRotation" @ string(!C.bAutoLevelCamera));
 	U.CC("Set SHHeroPawn CameraNoSnapRotation" @ string(!C.bAutoLevelCamera));
 	
@@ -302,6 +301,7 @@ function InitShadowDetail()
 	U.CC("Set KWPawn bNoShadows" @ U.BoolToString(C.ShadowDetail == DM_None));
 	U.CC("Set SHPropsStatic bNoShadows" @ U.BoolToString(C.ShadowDetail == DM_None));
 	
+	// Refresh shadows
 	foreach AllActors(class'KWPawn', KWP)
 	{
 		KWP.KWRemoveShadow();

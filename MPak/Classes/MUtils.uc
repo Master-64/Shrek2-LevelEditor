@@ -115,12 +115,16 @@ event PreBeginPlay()
 
 event Tick(float DeltaTime)
 {
-    fDeltaTime = DeltaTime;
+	fDeltaTime = DeltaTime;
 	
 	if(bLevelLoaded)
 	{
+		// 1 tick after level loads. Required for certain functions.
 		fOriginalLevelLoadTime = fDeltaTime;
 		fLevelLoadTime = fOriginalLevelLoadTime;
+		
+		// Master_64: This function MUST be called here to avoid an untraceable crash, thanks UE2!
+		GetHudItems();
 		
 		bLevelLoaded = false;
 	}
@@ -141,6 +145,10 @@ event PostLoadGame(bool bLoadFromSaveGame)
 	
 	// LevelInfo.InventoryCarrierPawn is only updated once and should never be adjusted from that point
 	CoreGetICP();
+	
+	// Master_64: Calling this at this point crashes the game with no trace, thanks UE2!
+	// GetHudItems();
+	GetCam();
 	
 	bLevelLoaded = true;
 	
@@ -864,6 +872,11 @@ function KillPawn(Pawn P, optional bool bPlayBumpline)
 
 function float GetHealth(Pawn P)
 {
+	if(P == none)
+	{
+		return 0.0;
+	}
+	
 	if(P.IsA('KWPawn'))
 	{
 		// This could technically result in inaccuracies but this shouldn't normally matter
@@ -886,6 +899,11 @@ function float GetHealth(Pawn P)
 
 function float GetMaxHealth(Pawn P)
 {
+	if(P == none)
+	{
+		return 100.0;
+	}
+	
 	if(P.IsA('SHHeroPawn'))
 	{
 		if(!IsShrek22())
@@ -1491,7 +1509,7 @@ static function QuickStringInsert(out array<string> sStrings, string sString)
 
 static function bool IsValueInRange(int iValue, int iMinRange, int iMaxRange)
 {
-    return iValue >= iMinRange && iValue <= iMaxRange;
+	return iValue >= iMinRange && iValue <= iMaxRange;
 }
 
 function bool IsStringDate(string sDate)
@@ -1665,7 +1683,7 @@ static function bool IsUpper(coerce string S)
 
 static function bool IsLower(coerce string S)
 {
-    return S == Lower(S);
+	return S == Lower(S);
 }
 
 static function string AlphaNumeric(string S)
@@ -1696,35 +1714,35 @@ static function string AlphaNumeric(string S)
 
 static function bool IsNumeric(string S)
 {
-    local int i, iChar;
-    local bool bDecimalPointFound;
+	local int i, iChar;
+	local bool bDecimalPointFound;
 	
 	if(S == "")
 	{
 		return false;
 	}
-    
-    for(i = 0; i < Len(S); i++)
-    {
-        iChar = Asc(Mid(S, i, 1));
-        
-        if(iChar == 46) // .
-        {
-            if(bDecimalPointFound)
-            {
+	
+	for(i = 0; i < Len(S); i++)
+	{
+		iChar = Asc(Mid(S, i, 1));
+		
+		if(iChar == 46) // .
+		{
+			if(bDecimalPointFound)
+			{
 				// 2 periods found
-                return false;
-            }
+				return false;
+			}
 			
-            bDecimalPointFound = true;
-        }
-        else if(iChar < 48 || iChar > 57) // 0-9
-        {
-            return false;
-        }
-    }
-    
-    return true;
+			bDecimalPointFound = true;
+		}
+		else if(iChar < 48 || iChar > 57) // 0-9
+		{
+			return false;
+		}
+	}
+	
+	return true;
 }
 
 function string GuessArrayTypeFromString(string sArrayText)
@@ -2097,7 +2115,7 @@ function vector GetMouseCoords()
 		GetPC();
 	}
 	
-    return Vec(PC.Player.WindowsMouseX, PC.Player.WindowsMouseY, 0.0);
+	return Vec(PC.Player.WindowsMouseX, PC.Player.WindowsMouseY, 0.0);
 }
 
 function bool IsMouseAvailable()
@@ -2265,9 +2283,13 @@ function bool PlayMovie(string sMovieName, bool bUseSound, optional bool bLoopMo
 	return M.IsPlaying();
 }
 
-function bool FancyPlayMovie(string sMovieName, bool bUseSound, optional bool bLoopMovie, optional bool bNoSmartPlay, optional string sMovieName512, optional string sMovieName640, optional string sMovieName1024)
+function bool FancyPlayMovie(string sMovieName, optional string sResolutions, optional bool bDoNotUseSound, optional bool bLoopMovie, optional bool bKnowWonderFileFormat)
 {
 	local Movie M;
+	local vector vCurrentRes, vBestRes;
+	local array<vector> vReses;
+	local array<string> sReses;
+	local int i;
 	
 	if(HUD == none)
 	{
@@ -2296,48 +2318,61 @@ function bool FancyPlayMovie(string sMovieName, bool bUseSound, optional bool bL
 		return false;
 	}
 	
-	if(!bNoSmartPlay)
+	if(!bKnowWonderFileFormat && sResolutions == "")
 	{
-		sMovieName512 = sMovieName $ "512";
-		sMovieName640 = sMovieName $ "640";
-		sMovieName1024 = sMovieName $ "1024";
+		sReses = Split(Localize("Info", "Resolutions", "..\\Movies\\" $ sMovieName), ",");
 	}
 	else
 	{
-		if(sMovieName512 == "")
+		sReses = Split(sResolutions, ",");
+	}
+	
+	if(sReses.Length == 0)
+	{
+		return false;
+	}
+	
+	for(i = 0; i < sReses.Length; i++)
+	{
+		vReses.Insert(vReses.Length, 1);
+		vReses[vReses.Length - 1].X = float(Left(sReses[i], InStr(sReses[i], "x")));
+		vReses[vReses.Length - 1].Y = float(Mid(sReses[i], InStr(sReses[i], "x") + 1));
+	}
+	
+	if(!bKnowWonderFileFormat && !bDoNotUseSound)
+	{
+		bDoNotUseSound = !bool(Localize("Info", "UseSound", "..\\Movies\\" $ sMovieName));
+	}
+	
+	if(!bKnowWonderFileFormat && !bLoopMovie)
+	{
+		bLoopMovie = bool(Localize("Info", "LoopMovie", "..\\Movies\\" $ sMovieName));
+	}
+	
+	vCurrentRes = GetResolution();
+	
+	for(i = 0; vReses.Length != 0; i++)
+	{
+		if(vCurrentRes.X >= vReses[i].X && vCurrentRes.Y >= vReses[i].Y)
 		{
-			sMovieName512 = sMovieName;
-		}
-		
-		if(sMovieName640 == "")
-		{
-			sMovieName640 = sMovieName;
-		}
-		
-		if(sMovieName1024 == "")
-		{
-			sMovieName1024 = sMovieName;
+			vBestRes = vReses[i];
+			
+			break;
 		}
 	}
 	
-	switch(GetResolution().X)
+	if(vBestRes.X == 0.0 || vBestRes.Y == 0.0)
 	{
-		case 512:
-			M.Play(FormatMovieString(sMovieName512), bUseSound, bLoopMovie);
-			
-			break;
-		case 640:
-			M.Play(FormatMovieString(sMovieName640), bUseSound, bLoopMovie);
-			
-			break;
-		case 1024:
-			M.Play(FormatMovieString(sMovieName1024), bUseSound, bLoopMovie);
-			
-			break;
-		default:
-			M.Play(FormatMovieString(sMovieName), bUseSound, bLoopMovie);
-			
-			break;
+		vBestRes = vCurrentRes;
+	}
+	
+	if(!bKnowWonderFileFormat)
+	{
+		M.Play(FormatMovieString(sMovieName $ "$" $ U.FloatToString(vBestRes.X) $ "x" $ U.FloatToString(vBestRes.Y)), !bDoNotUseSound, bLoopMovie);
+	}
+	else
+	{
+		M.Play(FormatMovieString(sMovieName $ U.FloatToString(vBestRes.X)), !bDoNotUseSound, bLoopMovie);
 	}
 	
 	if(M.IsPlaying())
@@ -2442,7 +2477,7 @@ function bool UnloadHUDItem(class<KWHudItem> C)
 		GetHUD();
 	}
 	
-	if(HUD == none)
+	if(HudItems.Length == 0)
 	{
 		GetHudItems();
 	}
@@ -2462,7 +2497,7 @@ function int IsHUDItemLoaded(class<KWHudItem> C)
 {
 	local int i;
 	
-	if(HUD == none)
+	if(HudItems.Length == 0)
 	{
 		GetHudItems();
 	}
@@ -2492,20 +2527,20 @@ static function bool IsPrime(int iValue)
 {
 	local int i;
 	
-    if(iValue <= 1)
-    {
-        return false;
-    }
+	if(iValue <= 1)
+	{
+		return false;
+	}
 	
-    for(i = 2; i * i <= iValue; i++)
-    {
-        if(iValue % i == 0)
-        {
-            return false;
-        }
-    }
+	for(i = 2; i * i <= iValue; i++)
+	{
+		if(iValue % i == 0)
+		{
+			return false;
+		}
+	}
 	
-    return true;
+	return true;
 }
 
 static function float GetMaxFloat(optional bool bGetInfinite)
@@ -3353,14 +3388,14 @@ function float CalculateVerticalFOV(float fHorizontalFOV)
 
 static function RemoveText(out string Source, string TextToRemove)
 {
-    local int StartIndex;
+	local int StartIndex;
 	
-    StartIndex = InStr(Source, TextToRemove);
+	StartIndex = InStr(Source, TextToRemove);
 	
-    if(StartIndex > -1)
-    {
-        Source = Left(Source, StartIndex - 1) $ Mid(Source, StartIndex + Len(TextToRemove));
-    }
+	if(StartIndex > -1)
+	{
+		Source = Left(Source, StartIndex - 1) $ Mid(Source, StartIndex + Len(TextToRemove));
+	}
 }
 
 function LipSyncDialog(KWPawn LipSyncOwner, Sound DialogSound, string sDialogLine)
@@ -3511,6 +3546,231 @@ static function bool Contains(string sKey, string sValue, optional bool bCaseSen
 	{
 		return InStr(sKey, sValue) > -1;
 	}
+}
+
+function array<Mutator> GetActiveMutators()
+{
+	local array<Mutator> MutatorList;
+	local Mutator CurrentMutator;
+
+	CurrentMutator = Level.Game.BaseMutator;
+
+	while(CurrentMutator != none)
+	{
+		MutatorList.Insert(MutatorList.Length, 1);
+		MutatorList[MutatorList.Length - 1] = CurrentMutator;
+
+		CurrentMutator = CurrentMutator.NextMutator;
+	}
+
+	return MutatorList;
+}
+
+function bool PlayerIsAttacking(SHHeroPawn P)
+{
+	return P.IsAttacking() || P.GetStateName() == 'stateRunAttack';
+}
+
+function string EvaluateExpression(string Expression)
+{
+	local array<string> Operators, ResultStack, OperatorStack;
+	local string Token, Op, NumberToken;
+	local float LeftOperand, RightOperand, Result;
+	local int i, j, ParenthesisDepth;
+	local bool IsOperator;
+	
+	const Ops = "( ) + - * /";
+	
+	Operators = U.Split(Ops);
+	
+	for(i = 0; i < Len(Expression); i++)
+	{
+		Token = Mid(Expression, i, 1);
+		
+		if(Token == " ")
+		{
+			continue;
+		}
+		
+		if(IsNumeric(Token))
+		{
+			NumberToken = "";
+			
+			while(i < Len(Expression) && IsNumeric(Mid(Expression, i, 1)))
+			{
+				NumberToken = NumberToken @ Mid(Expression, i, 1);
+				
+				i++;
+			}
+			
+			ResultStack.Insert(ResultStack.Length, 1);
+			ResultStack[ResultStack.Length - 1] = NumberToken;
+			
+			i--;
+		}
+		else
+		{
+			IsOperator = false;
+			
+			for(j = 0; j < Operators.Length; j++)
+			{
+				if(Operators[j] == Token)
+				{
+					IsOperator = true;
+					
+					break;
+				}
+			}
+			
+			if(IsOperator)
+			{
+				if(Token == "(")
+				{
+					ParenthesisDepth++;
+					
+					OperatorStack.Insert(OperatorStack.Length, 1);
+					OperatorStack[OperatorStack.Length - 1] = Token;
+				}
+				else if(Token == ")")
+				{
+					while(OperatorStack.Length > 0 && OperatorStack[OperatorStack.Length - 1] != "(")
+					{
+						if(ResultStack.Length < 2)
+						{
+							Warn("SyntaxError: Invalid expression");
+							
+							return "SyntaxError: Invalid expression";
+						}
+						
+						RightOperand = float(ResultStack[ResultStack.Length - 1]);
+						ResultStack.Remove(ResultStack.Length - 1, 1);
+						
+						Op = OperatorStack[OperatorStack.Length - 1];
+						OperatorStack.Remove(OperatorStack.Length - 1, 1);
+						
+						LeftOperand = float(ResultStack[ResultStack.Length - 1]);
+						ResultStack.Remove(ResultStack.Length - 1, 1);
+						
+						Result = DoMath(Op, LeftOperand, RightOperand);
+						ResultStack.Insert(ResultStack.Length, 1);
+						ResultStack[ResultStack.Length - 1] = FloatToString(Result);
+					}
+					
+					if(OperatorStack.Length > 0 && OperatorStack[OperatorStack.Length - 1] == "(")
+					{
+						OperatorStack.Remove(OperatorStack.Length - 1, 1);
+					}
+					
+					ResultStack.Insert(ResultStack.Length, 1);
+					ResultStack[ResultStack.Length - 1] = FloatToString(Result);
+				}
+				else
+				{
+					while(OperatorStack.Length > 0 && Precedence(OperatorStack[OperatorStack.Length - 1]) >= Precedence(Token))
+					{
+						if(ResultStack.Length < 2)
+						{
+							Warn("SyntaxError: Invalid expression");
+							
+							return "SyntaxError: Invalid expression";
+						}
+						
+						RightOperand = float(ResultStack[ResultStack.Length - 1]);
+						ResultStack.Remove(ResultStack.Length - 1, 1);
+						
+						Op = OperatorStack[OperatorStack.Length - 1];
+						OperatorStack.Remove(OperatorStack.Length - 1, 1);
+						
+						LeftOperand = float(ResultStack[ResultStack.Length - 1]);
+						ResultStack.Remove(ResultStack.Length - 1, 1);
+						
+						Result = DoMath(Op, LeftOperand, RightOperand);
+						ResultStack.Insert(ResultStack.Length, 1);
+						ResultStack[ResultStack.Length - 1] = FloatToString(Result);
+					}
+					
+					OperatorStack.Insert(OperatorStack.Length, 1);
+					OperatorStack[OperatorStack.Length - 1] = Token;
+				}
+			}
+		}
+	}
+
+	while(OperatorStack.Length > 0)
+	{
+		if(ResultStack.Length < 2)
+		{
+			Warn("SyntaxError: Invalid expression");
+			
+			return "SyntaxError: Invalid expression";
+		}
+		
+		RightOperand = float(ResultStack[ResultStack.Length - 1]);
+		ResultStack.Remove(ResultStack.Length - 1, 1);
+		
+		Op = OperatorStack[OperatorStack.Length - 1];
+		OperatorStack.Remove(OperatorStack.Length - 1, 1);
+		
+		LeftOperand = float(ResultStack[ResultStack.Length - 1]);
+		ResultStack.Remove(ResultStack.Length - 1, 1);
+		
+		Result = DoMath(Op, LeftOperand, RightOperand);
+		ResultStack.Insert(ResultStack.Length, 1);
+		ResultStack[ResultStack.Length - 1] = FloatToString(Result);
+	}
+	
+	if(ResultStack.Length == 1 && IsNumeric(ResultStack[0]))
+	{
+		return ResultStack[0];
+	}
+	else
+	{
+		Warn("SyntaxError: Invalid expression");
+		
+		return "SyntaxError: Invalid expression";
+	}
+}
+
+function int Precedence(string Op)
+{
+	switch(Op)
+	{
+		case "+": 
+		case "-": return 1;
+		case "*": 
+		case "/": return 2;
+		default: return 0;
+	}
+}
+
+function float DoMath(string Op, float LeftOperand, float RightOperand)
+{
+	switch(Op)
+	{
+		case "+": return LeftOperand + RightOperand;
+		case "-": return LeftOperand - RightOperand;
+		case "*": return LeftOperand * RightOperand;
+		case "/": 
+			if (RightOperand != 0.0)
+			{
+				return LeftOperand / RightOperand;
+			}
+			else
+			{
+				Warn("SyntaxError: Division by zero");
+				
+				return 0.0;
+			}
+		default:
+			Warn("SyntaxError: Invalid operator");
+			
+			return 0.0;
+	}
+}
+
+function string Eval(string S)
+{
+	return EvaluateExpression(S);
 }
 
 
